@@ -5,25 +5,37 @@ services:
     build: ./backend-server-1
     container_name: backend-server-1
     environment:
-      - SERVER_NAME=Backend-1
+      SERVER_NAME: Backend-1
+      SERVER_PORT: 8080
     ports:
       - "8081:8080"
+    volumes:
+      - ./backend-server-1/src:/app/src
+      - ./backend-server-1/pom.xml:/app/pom.xml
 
   backend-server-2:
     build: ./backend-server-2
     container_name: backend-server-2
     environment:
-      - SERVER_NAME=Backend-2
+      SERVER_NAME: Backend-2
+      SERVER_PORT: 8080
     ports:
       - "8082:8080"
+    volumes:
+      - ./backend-server-2/src:/app/src
+      - ./backend-server-2/pom.xml:/app/pom.xml
 
   backend-server-3:
     build: ./backend-server-3
     container_name: backend-server-3
     environment:
-      - SERVER_NAME=Backend-3
+      SERVER_NAME: Backend-3
+      SERVER_PORT: 8080
     ports:
       - "8083:8080"
+    volumes:
+      - ./backend-server-3/src:/app/src
+      - ./backend-server-3/pom.xml:/app/pom.xml
 
   load-balancer:
     build: ./load-balancer
@@ -33,4 +45,15 @@ services:
       - backend-server-2
       - backend-server-3
     ports:
-      - "8080:8080"
+      - "${SERVER_PORT}:${SERVER_PORT}"
+    environment:
+      SERVER_PORT: ${SERVER_PORT}
+      LOADBALANCER_ALGORITHM: ${LOADBALANCER_ALGORITHM}
+      LOADBALANCER_RETRIES: ${LOADBALANCER_RETRIES}
+      LOADBALANCER_RETRY_DELAY: ${LOADBALANCER_RETRY_DELAY}
+      HEALTHCHECK_ENABLED: ${HEALTHCHECK_ENABLED}
+      HEALTHCHECK_INTERVAL: ${HEALTHCHECK_INTERVAL}
+      HEALTHCHECK_PATH: ${HEALTHCHECK_PATH}
+    volumes:
+      - ./load-balancer/src:/app/src
+      - ./load-balancer/pom.xml:/app/pom.xml

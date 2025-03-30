@@ -1,5 +1,5 @@
-FROM openjdk:17
+FROM maven:3.9.0-eclipse-temurin-17 AS builder
 WORKDIR /app
-COPY target/backend-server-1-*.jar /app/backend-server-1.jar
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "backend-server-1.jar"]
+COPY pom.xml .
+RUN mvn dependency:go-offline
+CMD ["mvn", "spring-boot:run"]

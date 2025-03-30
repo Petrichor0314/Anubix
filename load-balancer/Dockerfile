@@ -1,5 +1,5 @@
-FROM openjdk:17
+FROM maven:3.9.0-eclipse-temurin-17 AS builder
 WORKDIR /app
-COPY target/load-balancer-*.jar load-balancer.jar
-EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "load-balancer.jar"]
+COPY pom.xml .
+RUN mvn dependency:go-offline
+CMD ["mvn", "spring-boot:run"]
