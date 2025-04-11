@@ -4,12 +4,15 @@ import com.petrichor.loadbalancer.load_balancer.config.LoadBalancerConfig;
 import com.petrichor.loadbalancer.load_balancer.factory.LoadBalancerAlgorithmFactory;
 import com.petrichor.loadbalancer.load_balancer.model.ServerInfo;
 import com.petrichor.loadbalancer.load_balancer.algorithm.LoadBalancerAlgorithm;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
+import org.springframework.web.server.ResponseStatusException;
 
-import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.stream.Collectors;
 
 @Service
 public class LoadBalancerService {
@@ -21,56 +24,66 @@ public class LoadBalancerService {
 
     public LoadBalancerService(LoadBalancerConfig config) {
         this.restTemplate = new RestTemplate();
-        this.serverInfos = new ArrayList<>();
         this.config = config;
-        // Initialize backend servers (these URLs can also be moved to config if needed)
+        this.serverInfos = new CopyOnWriteArrayList<>();
+
+        // Manually configured backend servers
         serverInfos.add(new ServerInfo("http://backend-server-1:8080/api/test"));
         serverInfos.add(new ServerInfo("http://backend-server-2:8080/api/test"));
         serverInfos.add(new ServerInfo("http://backend-server-3:8080/api/test"));
 
-        // Select algorithm based on config property
         this.loadBalancerAlgorithm = LoadBalancerAlgorithmFactory.getAlgorithm(config.getAlgorithm());
     }
 
-    public Optional<ServerInfo> selectServer() {
-        return loadBalancerAlgorithm.selectServer(serverInfos);
+    public List<ServerInfo> getServerInfos() {
+        return serverInfos;
+    }
+
+    public Optional<ServerInfo> selectServer(List<ServerInfo> candidates) {
+        return loadBalancerAlgorithm.selectServer(candidates);
     }
 
     public String forwardRequest() {
-        Optional<ServerInfo> optionalServer = selectServer();
-        if (optionalServer.isEmpty()) {
-            throw new RuntimeException("No healthy servers available");
-        }
-        ServerInfo server = optionalServer.get();
-        server.incrementConnections();
-
-        String response = null;
+        int retries = config.getRetries(); // from environment or config
         int attempts = 0;
-        while (attempts < config.getRetries()) {
+
+        while (attempts < retries) {
+            List<ServerInfo> healthyServers = serverInfos.stream()
+                    .filter(ServerInfo::isHealthy)
+                    .collect(Collectors.toList());
+
+            if (healthyServers.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "No healthy servers available");
+            }
+
+            Optional<ServerInfo> optionalServer = selectServer(healthyServers);
+            if (optionalServer.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE, "No server could be selected");
+            }
+
+            ServerInfo server = optionalServer.get();
+            server.incrementConnections();
+
             try {
                 long start = System.currentTimeMillis();
-                response = restTemplate.getForObject(server.getUrl(), String.class);
+                String response = restTemplate.getForObject(server.getUrl(), String.class);
                 long elapsed = System.currentTimeMillis() - start;
-                // Update average response time (simple averaging)
+
                 double currentAvg = server.getAvgResponseTime();
                 double newAvg = (currentAvg + elapsed) / 2.0;
                 server.setAvgResponseTime(newAvg);
-                break; // Success; exit loop
+
+                return response;
+
             } catch (Exception e) {
+                server.setHealthy(false); // mark as unhealthy on failure
+                System.err.println("Failed to reach " + server.getUrl() + ": " + e.getMessage());
                 attempts++;
-                try {
-                    Thread.sleep(config.getRetryDelay());
-                } catch (InterruptedException ie) {
-                    Thread.currentThread().interrupt();
-                    throw new RuntimeException("Retry interrupted", ie);
-                }
+            } finally {
+                server.decrementConnections();
             }
         }
 
-        server.decrementConnections();
-        if (response == null) {
-            throw new RuntimeException("Failed to get response after " + config.getRetries() + " attempts");
-        }
-        return response;
+        throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "All retries failed. No backend responded.");
     }
 }
