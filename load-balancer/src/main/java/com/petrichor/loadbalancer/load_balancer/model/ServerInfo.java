@@ -1,18 +1,20 @@
 package com.petrichor.loadbalancer.load_balancer.model;
 
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class ServerInfo {
-    private String url;
-    private AtomicInteger activeConnections;
-    private volatile double avgResponseTime;
-    private volatile boolean healthy;
+    private final String url;
+    private final AtomicInteger activeConnections;
+    private final AtomicReference<Double> avgResponseTime;
+    private final AtomicBoolean healthy;
 
     public ServerInfo(String url) {
         this.url = url;
         this.activeConnections = new AtomicInteger(0);
-        this.avgResponseTime = 0.0;
-        this.healthy = true;
+        this.avgResponseTime = new AtomicReference<>(0.0);
+        this.healthy = new AtomicBoolean(true);
     }
 
     public String getUrl() {
@@ -32,18 +34,18 @@ public class ServerInfo {
     }
 
     public double getAvgResponseTime() {
-        return avgResponseTime;
+        return avgResponseTime.get();
     }
 
-    public void setAvgResponseTime(double avgResponseTime) {
-        this.avgResponseTime = avgResponseTime;
+    public void setAvgResponseTime(double newTime) {
+        avgResponseTime.set(newTime);
     }
 
     public boolean isHealthy() {
-        return healthy;
+        return healthy.get();
     }
 
-    public void setHealthy(boolean healthy) {
-        this.healthy = healthy;
+    public void setHealthy(boolean isHealthy) {
+        healthy.set(isHealthy);
     }
 }

@@ -45,6 +45,17 @@
 			<scope>test</scope>
 		</dependency>
 
+		<!-- Spring Boot Starter WebFlux (Reactive) -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-starter-webflux</artifactId>
+		</dependency>
+
+		<dependency>
+			<groupId>io.projectreactor</groupId>
+			<artifactId>reactor-core</artifactId>
+		</dependency>
+
 	</dependencies>
 
 	<build>
