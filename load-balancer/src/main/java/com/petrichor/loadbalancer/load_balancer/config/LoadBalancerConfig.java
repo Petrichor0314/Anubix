@@ -27,6 +27,15 @@ public class LoadBalancerConfig {
     @Value("${loadbalancer.healthcheck.path:/health}")
     private String healthCheckPath;
 
+    @Value("${loadbalancer.healthcheck.retries:3}")
+    private int healthCheckRetries;
+
+    @Value("${loadbalancer.healthcheck.retry-delay:1000}")
+    private int healthCheckRetryDelay;
+
+    @Value("${loadbalancer.healthcheck.timeout:2}")
+    private int healthCheckTimeoutSeconds;
+
     // Getters
     public int getPort() {
         return port;
@@ -54,5 +63,17 @@ public class LoadBalancerConfig {
 
     public String getHealthCheckPath() {
         return healthCheckPath;
+    }
+
+    public int getHealthCheckRetries() {
+        return healthCheckRetries;
+    }
+
+    public int getHealthCheckRetryDelayMillis() {
+        return healthCheckRetryDelay;
+    }
+
+    public int getHealthCheckTimeoutSeconds() {
+        return healthCheckTimeoutSeconds;
     }
 }

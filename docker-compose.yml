@@ -12,6 +12,8 @@ services:
     volumes:
       - ./backend-server-1/src:/app/src
       - ./backend-server-1/pom.xml:/app/pom.xml
+    networks:
+      - monitoring
 
   backend-server-2:
     build: ./backend-server-2
@@ -24,6 +26,8 @@ services:
     volumes:
       - ./backend-server-2/src:/app/src
       - ./backend-server-2/pom.xml:/app/pom.xml
+    networks:
+      - monitoring
 
   backend-server-3:
     build: ./backend-server-3
@@ -36,6 +40,8 @@ services:
     volumes:
       - ./backend-server-3/src:/app/src
       - ./backend-server-3/pom.xml:/app/pom.xml
+    networks:
+      - monitoring
 
   load-balancer:
     build: ./load-balancer
@@ -54,6 +60,32 @@ services:
       HEALTHCHECK_ENABLED: ${HEALTHCHECK_ENABLED}
       HEALTHCHECK_INTERVAL: ${HEALTHCHECK_INTERVAL}
       HEALTHCHECK_PATH: ${HEALTHCHECK_PATH}
+      HEALTHCHECK_RETRIES : ${HEALTHCHECK_RETRIES}
+      HEALTHCHECK_RETRY_DELAY : ${HEALTHCHECK_RETRY_DELAY}
+      HEALTHCHECK_TIMEOUT : ${HEALTHCHECK_TIMEOUT}
     volumes:
       - ./load-balancer/src:/app/src
       - ./load-balancer/pom.xml:/app/pom.xml
+    networks:
+      - monitoring
+
+  prometheus:
+    image: prom/prometheus
+    container_name: prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    networks:
+      - monitoring
+
+  grafana:
+    image: grafana/grafana
+    container_name: grafana
+    ports:
+      - "3000:3000"
+    networks:
+      - monitoring
+
+networks:
+  monitoring:

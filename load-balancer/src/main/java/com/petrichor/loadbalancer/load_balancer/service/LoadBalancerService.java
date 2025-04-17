@@ -4,6 +4,13 @@ import com.petrichor.loadbalancer.load_balancer.config.LoadBalancerConfig;
 import com.petrichor.loadbalancer.load_balancer.factory.LoadBalancerAlgorithmFactory;
 import com.petrichor.loadbalancer.load_balancer.model.ServerInfo;
 import com.petrichor.loadbalancer.load_balancer.algorithm.LoadBalancerAlgorithm;
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
+import io.github.resilience4j.retry.RetryRegistry;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.reactor.retry.RetryOperator;
+import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
+import io.github.resilience4j.retry.RetryConfig;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -24,7 +31,10 @@ public class LoadBalancerService {
     private final LoadBalancerAlgorithm loadBalancerAlgorithm;
     private final LoadBalancerConfig config;
 
-    public LoadBalancerService(LoadBalancerConfig config, WebClient webClient) {
+    private final CircuitBreakerRegistry circuitBreakerRegistry;
+    private final RetryRegistry retryRegistry;
+
+    public LoadBalancerService(LoadBalancerConfig config, WebClient webClient, CircuitBreakerRegistry circuitBreakerRegistry, RetryRegistry retryRegistry) {
         this.webClient = webClient;
         this.config = config;
         this.serverInfos = new CopyOnWriteArrayList<>();
@@ -35,6 +45,10 @@ public class LoadBalancerService {
         serverInfos.add(new ServerInfo("http://backend-server-3:8080/api/test"));
 
         this.loadBalancerAlgorithm = LoadBalancerAlgorithmFactory.getAlgorithm(config.getAlgorithm());
+
+        // Initialize circuit breakers for each server
+        this.circuitBreakerRegistry = circuitBreakerRegistry;
+        this.retryRegistry = retryRegistry;
     }
 
     public List<ServerInfo> getServerInfos() {
@@ -68,25 +82,36 @@ public class LoadBalancerService {
         }
 
         ServerInfo server = optionalServer.get();
-        server.incrementConnections();
+        server.incrementConnections(); // still needed for connection tracking
 
+        return forwardRequestToServer(server)
+                .doOnError(error -> {
+                    server.setHealthy(false);
+                    System.err.println("Failed to reach " + server.getUrl() + ": " + error.getMessage());
+                })
+                .onErrorResume(error -> attemptForward(attempt + 1))
+                .doFinally(signal -> server.decrementConnections());
+    }
+
+
+    private Mono<String> forwardRequestToServer(ServerInfo server) {
         long start = System.currentTimeMillis();
+
+        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(server.getUrl());
+        Retry retry = retryRegistry.retry("load-balancer-retry");
 
         return webClient.get()
                 .uri(server.getUrl())
                 .retrieve()
                 .bodyToMono(String.class)
+                .transform(CircuitBreakerOperator.of(circuitBreaker))
+                .transform(RetryOperator.of(retry))
                 .doOnNext(response -> {
                     long elapsed = System.currentTimeMillis() - start;
                     double currentAvg = server.getAvgResponseTime();
                     double newAvg = (currentAvg + elapsed) / 2.0;
                     server.setAvgResponseTime(newAvg);
-                })
-                .doOnError(error -> {
-                    server.setHealthy(false);
-                    System.err.println("Failed to reach " + server.getUrl() + ": " + error.getMessage());
-                })
-                .doFinally(signal -> server.decrementConnections())
-                .onErrorResume(error -> attemptForward(attempt + 1));
+                });
     }
+
 }
