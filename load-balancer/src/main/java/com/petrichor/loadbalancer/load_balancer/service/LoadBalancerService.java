@@ -10,49 +10,53 @@ import io.github.resilience4j.retry.RetryRegistry;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.reactor.retry.RetryOperator;
 import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
-import io.github.resilience4j.retry.RetryConfig;
+import org.springframework.cloud.client.ServiceInstance;
+import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.stream.Collectors;
 
 @Service
 public class LoadBalancerService {
 
-    private final List<ServerInfo> serverInfos;
     private final WebClient webClient;
     private final LoadBalancerAlgorithm loadBalancerAlgorithm;
     private final LoadBalancerConfig config;
-
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final RetryRegistry retryRegistry;
+    private final DiscoveryClient discoveryClient;
 
-    public LoadBalancerService(LoadBalancerConfig config, WebClient webClient, CircuitBreakerRegistry circuitBreakerRegistry, RetryRegistry retryRegistry) {
+    public LoadBalancerService(
+            LoadBalancerConfig config,
+            WebClient webClient,
+            CircuitBreakerRegistry circuitBreakerRegistry,
+            RetryRegistry retryRegistry,
+            DiscoveryClient discoveryClient
+    ) {
         this.webClient = webClient;
         this.config = config;
-        this.serverInfos = new CopyOnWriteArrayList<>();
-
-        // Manually configured backend servers
-        serverInfos.add(new ServerInfo("http://backend-server-1:8080/api/test"));
-        serverInfos.add(new ServerInfo("http://backend-server-2:8080/api/test"));
-        serverInfos.add(new ServerInfo("http://backend-server-3:8080/api/test"));
-
+        this.discoveryClient = discoveryClient;
         this.loadBalancerAlgorithm = LoadBalancerAlgorithmFactory.getAlgorithm(config.getAlgorithm());
-
-        // Initialize circuit breakers for each server
         this.circuitBreakerRegistry = circuitBreakerRegistry;
         this.retryRegistry = retryRegistry;
     }
 
     public List<ServerInfo> getServerInfos() {
-        return serverInfos;
+        List<ServiceInstance> instances = discoveryClient.getInstances("BACKEND-SERVICE");
+
+        for (ServiceInstance instance : instances) {
+            System.out.println("Discovered URI: " + instance.getUri());
+        }
+
+        return instances.stream()
+                .map(instance -> new ServerInfo(instance.getUri().toString() + "/api/test"))
+                .collect(Collectors.toList());
     }
 
     public Optional<ServerInfo> selectServer(List<ServerInfo> candidates) {
@@ -68,7 +72,7 @@ public class LoadBalancerService {
             return Mono.error(new ResponseStatusException(HttpStatus.BAD_GATEWAY, "All retries failed. No backend responded."));
         }
 
-        List<ServerInfo> healthyServers = serverInfos.stream()
+        List<ServerInfo> healthyServers = getServerInfos().stream()
                 .filter(ServerInfo::isHealthy)
                 .collect(Collectors.toList());
 
@@ -82,7 +86,7 @@ public class LoadBalancerService {
         }
 
         ServerInfo server = optionalServer.get();
-        server.incrementConnections(); // still needed for connection tracking
+        server.incrementConnections(); // for connection tracking
 
         return forwardRequestToServer(server)
                 .doOnError(error -> {
@@ -92,7 +96,6 @@ public class LoadBalancerService {
                 .onErrorResume(error -> attemptForward(attempt + 1))
                 .doFinally(signal -> server.decrementConnections());
     }
-
 
     private Mono<String> forwardRequestToServer(ServerInfo server) {
         long start = System.currentTimeMillis();
@@ -113,5 +116,4 @@ public class LoadBalancerService {
                     server.setAvgResponseTime(newAvg);
                 });
     }
-
 }

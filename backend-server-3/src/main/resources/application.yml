@@ -1,2 +1,6 @@
+spring:
+  application:
+    name: backend-service
+
 server:
-  port: 8080
+  port: ${SERVER_PORT}

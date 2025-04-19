@@ -87,5 +87,16 @@ services:
     networks:
       - monitoring
 
+  discovery-server:
+    build: ./discovery-server
+    container_name: discovery-server
+    ports:
+      - "8761:8761"
+    volumes:
+      - ./discovery-server/src:/app/src
+      - ./discovery-server/pom.xml:/app/pom.xml
+    networks:
+      - monitoring
+
 networks:
   monitoring:

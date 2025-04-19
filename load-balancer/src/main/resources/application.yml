@@ -16,3 +16,5 @@ resilience4j:
       http://backend-server-3:8080/api/test:
         sliding-window-size: 10
         failure-rate-threshold: 50
+
+
