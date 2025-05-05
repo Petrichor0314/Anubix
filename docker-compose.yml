@@ -1,55 +1,54 @@
 version: '3.8'
 
 services:
-  backend-server-1:
-    build: ./backend-server-1
-    container_name: backend-server-1
+  feature-service:
+    build:
+      context: .
+      dockerfile: feature-service/Dockerfile
+    container_name: feature-service
     environment:
-      SERVER_NAME: Backend-1
+      SERVER_NAME: feature-service
       SERVER_PORT: 8080
     ports:
       - "8081:8080"
-    volumes:
-      - ./backend-server-1/src:/app/src
-      - ./backend-server-1/pom.xml:/app/pom.xml
     networks:
       - monitoring
 
-  backend-server-2:
-    build: ./backend-server-2
-    container_name: backend-server-2
+  toggle-service:
+    build:
+      context: .
+      dockerfile: toggle-service/Dockerfile
+    container_name: toggle-service
     environment:
-      SERVER_NAME: Backend-2
+      SERVER_NAME: toggle-service
       SERVER_PORT: 8080
     ports:
       - "8082:8080"
-    volumes:
-      - ./backend-server-2/src:/app/src
-      - ./backend-server-2/pom.xml:/app/pom.xml
     networks:
       - monitoring
 
-  backend-server-3:
-    build: ./backend-server-3
-    container_name: backend-server-3
+  analytics-service:
+    build:
+      context: .
+      dockerfile: analytics-service/Dockerfile
+    container_name: analytics-service
     environment:
-      SERVER_NAME: Backend-3
+      SERVER_NAME: analytics-service
       SERVER_PORT: 8080
     ports:
       - "8083:8080"
-    volumes:
-      - ./backend-server-3/src:/app/src
-      - ./backend-server-3/pom.xml:/app/pom.xml
     networks:
       - monitoring
 
-  load-balancer:
-    build: ./load-balancer
-    container_name: load-balancer
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
     depends_on:
-      - backend-server-1
-      - backend-server-2
-      - backend-server-3
+      - feature-service
+      - toggle-service
+      - analytics-service
     ports:
       - "${SERVER_PORT}:${SERVER_PORT}"
     environment:
@@ -57,15 +56,6 @@ services:
       LOADBALANCER_ALGORITHM: ${LOADBALANCER_ALGORITHM}
       LOADBALANCER_RETRIES: ${LOADBALANCER_RETRIES}
       LOADBALANCER_RETRY_DELAY: ${LOADBALANCER_RETRY_DELAY}
-      HEALTHCHECK_ENABLED: ${HEALTHCHECK_ENABLED}
-      HEALTHCHECK_INTERVAL: ${HEALTHCHECK_INTERVAL}
-      HEALTHCHECK_PATH: ${HEALTHCHECK_PATH}
-      HEALTHCHECK_RETRIES : ${HEALTHCHECK_RETRIES}
-      HEALTHCHECK_RETRY_DELAY : ${HEALTHCHECK_RETRY_DELAY}
-      HEALTHCHECK_TIMEOUT : ${HEALTHCHECK_TIMEOUT}
-    volumes:
-      - ./load-balancer/src:/app/src
-      - ./load-balancer/pom.xml:/app/pom.xml
     networks:
       - monitoring
 
@@ -88,13 +78,12 @@ services:
       - monitoring
 
   discovery-server:
-    build: ./discovery-server
+    build:
+      context: .
+      dockerfile: discovery-server/Dockerfile
     container_name: discovery-server
     ports:
       - "8761:8761"
-    volumes:
-      - ./discovery-server/src:/app/src
-      - ./discovery-server/pom.xml:/app/pom.xml
     networks:
       - monitoring
 
