@@ -25,7 +25,6 @@ import io.github.resilience4j.reactor.ratelimiter.operator.RateLimiterOperator;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 @Service
 public class ApiGatewayService {
@@ -61,98 +60,84 @@ public class ApiGatewayService {
 
 
     /**
-     * Public entrypoint. Forwards the request to a healthy service instance.
+     * Public entrypoint. Forwards the request to a service instance chosen by the load balancer.
+     * Resilience4j policies (Retry, CircuitBreaker, RateLimiter) are applied to the call on the selected instance.
      */
     public Mono<String> forwardRequest(String serviceName, String path, String httpMethod) {
-        System.out.printf("[forwardRequest] Forwarding %s → service: %s, path: %s%n", httpMethod, serviceName, path);
-        return attemptForward(serviceName, path, httpMethod, 0);
-    }
+        System.out.printf("[forwardRequest] Processing %s request for service: %s, path: %s%n", httpMethod, serviceName, path);
 
-    /**
-     * Attempts to route the request to a healthy service instance with retries.
-     */
-    private Mono<String> attemptForward(String serviceName, String path, String method, int attempt) {
-        System.out.printf("[attemptForward][Attempt #%d] Attempting to route request to: %s%n", attempt + 1, serviceName);
+        List<ServiceInstance> serviceInstances = discoveryClient.getInstances(serviceName);
 
-        List<ServerInfo> healthyInstances = getHealthyInstances(serviceName);
-
-        if (healthyInstances.isEmpty()) {
-            System.err.println("[attemptForward] No healthy instances found for service: " + serviceName);
+        if (serviceInstances.isEmpty()) {
+            System.err.println("[forwardRequest] No instances found for service: " + serviceName);
             return Mono.error(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "No healthy instances for service: " + serviceName));
+                    "No instances available for service: " + serviceName));
         }
 
-        Optional<ServerInfo> selected = loadBalancerAlgorithm.selectServer(healthyInstances);
+        // Map ServiceInstance to ServerInfo. ServerInfo might hold connection counts or response times for advanced LB.
+        // If ServerInfo is not needed for advanced LB algorithms, this map can be simpler or removed.
+        List<ServerInfo> availableServers = serviceInstances.stream()
+                                                            .map(si -> new ServerInfo(si.getUri().toString())) // Assuming ServerInfo constructor takes URI
+                                                            .toList();
 
-        if (selected.isEmpty()) {
-            System.err.println("[attemptForward] Load balancer failed to select an instance for service: " + serviceName);
+        Optional<ServerInfo> selectedServerOptional = loadBalancerAlgorithm.selectServer(availableServers);
+
+        if (selectedServerOptional.isEmpty()) {
+            System.err.println("[forwardRequest] Load balancer failed to select an instance for service: " + serviceName);
             return Mono.error(new ResponseStatusException(HttpStatus.SERVICE_UNAVAILABLE,
-                    "LoadBalancer failed to select instance"));
+                    "LoadBalancer failed to select instance for service: " + serviceName));
         }
 
-        ServerInfo server = selected.get();
-        server.incrementConnections();
+        ServerInfo server = selectedServerOptional.get();
+        
+        // Increment connections if your LoadBalancerAlgorithm uses this information (e.g., LeastConnections)
+        // This implies ServerInfo needs to be stateful and potentially thread-safe if shared.
+        server.incrementConnections(); 
+        System.out.printf("[forwardRequest] Routing to instance: %s (%s)%n", server.getUrl(), serviceName);
 
-        System.out.printf("[attemptForward]  Routing to instance: %s (%s)%n", server.getUrl(), serviceName);
-
-        return forwardToInstance(serviceName, server, path, method)
+        return forwardToInstance(serviceName, server, path, httpMethod)
                 .doOnError(err -> {
-                    System.err.printf("[attemptForward] Request failed to %s: %s%n", server.getUrl(), err.getMessage());
-                    server.setHealthy(false);
-                })
-                .onErrorResume(err -> {
-                    System.out.printf("[attemptForward] Retrying after failure on %s%n", server.getUrl());
-                    return attemptForward(serviceName, path, method, attempt + 1);
+                    // Error handling after Resilience4j policies have been applied (e.g. retries exhausted, circuit open)
+                    System.err.printf("[forwardRequest] Request to %s failed ultimately: %s%n", server.getUrl(), err.getMessage());
+                    // Note: We no longer manually mark server.setHealthy(false) here.
+                    // The circuit breaker for this instance/service will handle taking it out of rotation if necessary.
                 })
                 .doFinally(signalType -> {
-                    System.out.printf("[attemptForward] Finished handling request to %s - releasing connection%n", server.getUrl());
+                    // Decrement connections if your LoadBalancerAlgorithm uses this information
+                    System.out.printf("[forwardRequest] Finished request to %s - decrementing connections%n", server.getUrl());
                     server.decrementConnections();
                 });
     }
 
     /**
-     * Performs the actual HTTP call to the target service instance.
+     * Performs the actual HTTP call to the target service instance,
+     * wrapped with Resilience4j policies (RateLimiter, CircuitBreaker, Retry).
      */
     private Mono<String> forwardToInstance(String serviceName, ServerInfo server, String path, String method)
     {
         String url = server.getUrl() + path;
-        long startTime = System.currentTimeMillis();
+        long startTime = System.currentTimeMillis(); // For measuring response time, potentially for ServerInfo
 
-        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(serviceName);
-        Retry retry = retryRegistry.retry("load-balancer-retry");
-
-        // Use rate limiter per service
-        RateLimiter rateLimiter = rateLimiterRegistry.rateLimiter(serviceName);
+        // Fetch service-specific or global Resilience4j components
+        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(serviceName); // Or a more specific name if instance-level
+        Retry retry = retryRegistry.retry("load-balancer-retry"); // A named, global retry config
+        RateLimiter rateLimiter = rateLimiterRegistry.rateLimiter(serviceName); // Service-specific rate limiter
 
         System.out.printf("[forwardToInstance] Sending %s to: %s%n", method, url);
 
         return webClient.method(HttpMethod.valueOf(method))
                 .uri(url)
-                .retrieve()
+                .retrieve() // Simple retrieve, assumes response body is String and handles errors via status codes
                 .bodyToMono(String.class)
-                .transform(RateLimiterOperator.of(rateLimiter)) //  Applying Rate Limiting
-                .transform(CircuitBreakerOperator.of(circuitBreaker)) //Applying circuit breaker
+                .transform(RateLimiterOperator.of(rateLimiter))
+                .transform(CircuitBreakerOperator.of(circuitBreaker))
                 .transform(RetryOperator.of(retry))
-                .doOnNext(response -> {
+                .doOnSuccess(response -> { // Changed from doOnNext to clarify it's after successful emission
                     double elapsed = System.currentTimeMillis() - startTime;
-                    server.setAvgResponseTime((server.getAvgResponseTime() + elapsed) / 2.0);
+                    // Update avgResponseTime in ServerInfo if used by an AdaptiveAlgorithm
+                    // This implies ServerInfo needs to be stateful and potentially thread-safe.
+                    server.setAvgResponseTime((server.getAvgResponseTime() + elapsed) / 2.0); 
                     System.out.printf("[forwardToInstance] Received response from %s in %.2f ms%n", server.getUrl(), elapsed);
                 });
-    }
-
-    /**
-     * Retrieves and filters healthy service instances via Eureka.
-     */
-    private List<ServerInfo> getHealthyInstances(String eurekaServiceName) {
-        System.out.printf("[getHealthyInstances] Looking up instances for: %s%n", eurekaServiceName);
-
-        List<ServiceInstance> instances = discoveryClient.getInstances(eurekaServiceName);
-
-        System.out.printf("[getHealthyInstances] Found %d instances for %s%n", instances.size(), eurekaServiceName);
-
-        return instances.stream()
-                .map(instance -> new ServerInfo(instance.getUri().toString()))
-                .filter(ServerInfo::isHealthy)
-                .collect(Collectors.toList());
     }
 }

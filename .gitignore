@@ -1,3 +1,6 @@
 .idea/
 .DS_Store
 Thumbs.db
+.clean-structure.txt
+.vscode/
+.venv/
