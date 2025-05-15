@@ -1,15 +1,8 @@
 package com.petrichor.loadbalancer.load_balancer.service;
 
-import com.petrichor.loadbalancer.load_balancer.config.LoadBalancerConfig;
-import com.petrichor.loadbalancer.load_balancer.algorithm.LoadBalancerAlgorithm;
-import com.petrichor.loadbalancer.load_balancer.factory.LoadBalancerAlgorithmFactory;
-import com.petrichor.loadbalancer.load_balancer.model.ServerInfo;
-import io.github.resilience4j.circuitbreaker.CircuitBreaker;
-import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
-import io.github.resilience4j.retry.RetryRegistry;
-import io.github.resilience4j.retry.Retry;
-import io.github.resilience4j.reactor.retry.RetryOperator;
-import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
+import java.util.List;
+import java.util.Optional;
+
 import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.DiscoveryClient;
 import org.springframework.http.HttpMethod;
@@ -17,14 +10,22 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ResponseStatusException;
-import reactor.core.publisher.Mono;
+
+import com.petrichor.loadbalancer.load_balancer.algorithm.LoadBalancerAlgorithm;
+import com.petrichor.loadbalancer.load_balancer.config.LoadBalancerConfig;
+import com.petrichor.loadbalancer.load_balancer.factory.LoadBalancerAlgorithmFactory;
+import com.petrichor.loadbalancer.load_balancer.model.ServerInfo;
+
+import io.github.resilience4j.circuitbreaker.CircuitBreaker;
+import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
 import io.github.resilience4j.ratelimiter.RateLimiter;
 import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import io.github.resilience4j.reactor.circuitbreaker.operator.CircuitBreakerOperator;
 import io.github.resilience4j.reactor.ratelimiter.operator.RateLimiterOperator;
-
-
-import java.util.List;
-import java.util.Optional;
+import io.github.resilience4j.reactor.retry.RetryOperator;
+import io.github.resilience4j.retry.Retry;
+import io.github.resilience4j.retry.RetryRegistry;
+import reactor.core.publisher.Mono;
 
 @Service
 public class ApiGatewayService {
@@ -74,8 +75,6 @@ public class ApiGatewayService {
                     "No instances available for service: " + serviceName));
         }
 
-        // Map ServiceInstance to ServerInfo. ServerInfo might hold connection counts or response times for advanced LB.
-        // If ServerInfo is not needed for advanced LB algorithms, this map can be simpler or removed.
         List<ServerInfo> availableServers = serviceInstances.stream()
                                                             .map(si -> new ServerInfo(si.getUri().toString())) // Assuming ServerInfo constructor takes URI
                                                             .toList();
@@ -90,20 +89,15 @@ public class ApiGatewayService {
 
         ServerInfo server = selectedServerOptional.get();
         
-        // Increment connections if your LoadBalancerAlgorithm uses this information (e.g., LeastConnections)
-        // This implies ServerInfo needs to be stateful and potentially thread-safe if shared.
         server.incrementConnections(); 
         System.out.printf("[forwardRequest] Routing to instance: %s (%s)%n", server.getUrl(), serviceName);
 
         return forwardToInstance(serviceName, server, path, httpMethod)
                 .doOnError(err -> {
-                    // Error handling after Resilience4j policies have been applied (e.g. retries exhausted, circuit open)
                     System.err.printf("[forwardRequest] Request to %s failed ultimately: %s%n", server.getUrl(), err.getMessage());
-                    // Note: We no longer manually mark server.setHealthy(false) here.
-                    // The circuit breaker for this instance/service will handle taking it out of rotation if necessary.
+                
                 })
                 .doFinally(signalType -> {
-                    // Decrement connections if your LoadBalancerAlgorithm uses this information
                     System.out.printf("[forwardRequest] Finished request to %s - decrementing connections%n", server.getUrl());
                     server.decrementConnections();
                 });
@@ -119,8 +113,8 @@ public class ApiGatewayService {
         long startTime = System.currentTimeMillis(); // For measuring response time, potentially for ServerInfo
 
         // Fetch service-specific or global Resilience4j components
-        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(serviceName); // Or a more specific name if instance-level
-        Retry retry = retryRegistry.retry("load-balancer-retry"); // A named, global retry config
+        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(serviceName); 
+        Retry retry = retryRegistry.retry("load-balancer-retry"); 
         RateLimiter rateLimiter = rateLimiterRegistry.rateLimiter(serviceName); // Service-specific rate limiter
 
         System.out.printf("[forwardToInstance] Sending %s to: %s%n", method, url);
@@ -132,10 +126,8 @@ public class ApiGatewayService {
                 .transform(RateLimiterOperator.of(rateLimiter))
                 .transform(CircuitBreakerOperator.of(circuitBreaker))
                 .transform(RetryOperator.of(retry))
-                .doOnSuccess(response -> { // Changed from doOnNext to clarify it's after successful emission
+                .doOnSuccess(response -> { 
                     double elapsed = System.currentTimeMillis() - startTime;
-                    // Update avgResponseTime in ServerInfo if used by an AdaptiveAlgorithm
-                    // This implies ServerInfo needs to be stateful and potentially thread-safe.
                     server.setAvgResponseTime((server.getAvgResponseTime() + elapsed) / 2.0); 
                     System.out.printf("[forwardToInstance] Received response from %s in %.2f ms%n", server.getUrl(), elapsed);
                 });
