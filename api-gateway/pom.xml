@@ -57,8 +57,8 @@
 
 		<dependency>
 			<groupId>io.github.resilience4j</groupId>
-			<artifactId>resilience4j-spring-boot2</artifactId>
-			<version>1.7.1</version>
+			<artifactId>resilience4j-spring-boot3</artifactId>
+			<version>2.1.0</version>
 		</dependency>
 		<dependency>
 			<groupId>io.github.resilience4j</groupId>
@@ -77,6 +77,15 @@
 			<artifactId>resilience4j-reactor</artifactId>
 			<version>2.1.0</version>
 		</dependency>
+
+		<dependency>
+			<groupId>io.github.resilience4j</groupId>
+			<artifactId>resilience4j-ratelimiter</artifactId>
+		</dependency>
+
+
+
+
 		<!-- Micrometer Prometheus registry -->
 		<dependency>
 			<groupId>io.micrometer</groupId>
@@ -85,6 +94,7 @@
 		<dependency>
 			<groupId>org.springframework.cloud</groupId>
 			<artifactId>spring-cloud-starter-netflix-eureka-client</artifactId>
+			<version>4.2.1</version>
 		</dependency>
 
 

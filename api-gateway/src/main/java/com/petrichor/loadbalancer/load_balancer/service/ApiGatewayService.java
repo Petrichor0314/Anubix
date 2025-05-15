@@ -18,6 +18,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.server.ResponseStatusException;
 import reactor.core.publisher.Mono;
+import io.github.resilience4j.ratelimiter.RateLimiter;
+import io.github.resilience4j.ratelimiter.RateLimiterRegistry;
+import io.github.resilience4j.reactor.ratelimiter.operator.RateLimiterOperator;
+
 
 import java.util.List;
 import java.util.Optional;
@@ -33,12 +37,14 @@ public class ApiGatewayService {
     private final CircuitBreakerRegistry circuitBreakerRegistry;
     private final RetryRegistry retryRegistry;
     private final DiscoveryClient discoveryClient;
+    private final RateLimiterRegistry rateLimiterRegistry;
 
     public ApiGatewayService(
             LoadBalancerConfig config,
             WebClient webClient,
             CircuitBreakerRegistry circuitBreakerRegistry,
             RetryRegistry retryRegistry,
+            RateLimiterRegistry rateLimiterRegistry,
             DiscoveryClient discoveryClient
     ) {
         this.webClient = webClient;
@@ -46,11 +52,13 @@ public class ApiGatewayService {
         this.discoveryClient = discoveryClient;
         this.circuitBreakerRegistry = circuitBreakerRegistry;
         this.retryRegistry = retryRegistry;
+        this.rateLimiterRegistry = rateLimiterRegistry;
         this.loadBalancerAlgorithm = LoadBalancerAlgorithmFactory.getAlgorithm(config.getAlgorithm());
 
         System.out.println("[ApiGatewayService] Initialized with load balancer: " +
                 this.loadBalancerAlgorithm.getClass().getSimpleName());
     }
+
 
     /**
      * Public entrypoint. Forwards the request to a healthy service instance.
@@ -87,7 +95,7 @@ public class ApiGatewayService {
 
         System.out.printf("[attemptForward]  Routing to instance: %s (%s)%n", server.getUrl(), serviceName);
 
-        return forwardToInstance(server, path, method)
+        return forwardToInstance(serviceName, server, path, method)
                 .doOnError(err -> {
                     System.err.printf("[attemptForward] Request failed to %s: %s%n", server.getUrl(), err.getMessage());
                     server.setHealthy(false);
@@ -105,12 +113,16 @@ public class ApiGatewayService {
     /**
      * Performs the actual HTTP call to the target service instance.
      */
-    private Mono<String> forwardToInstance(ServerInfo server, String path, String method) {
+    private Mono<String> forwardToInstance(String serviceName, ServerInfo server, String path, String method)
+    {
         String url = server.getUrl() + path;
         long startTime = System.currentTimeMillis();
 
-        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(server.getUrl());
+        CircuitBreaker circuitBreaker = circuitBreakerRegistry.circuitBreaker(serviceName);
         Retry retry = retryRegistry.retry("load-balancer-retry");
+
+        // Use rate limiter per service
+        RateLimiter rateLimiter = rateLimiterRegistry.rateLimiter(serviceName);
 
         System.out.printf("[forwardToInstance] Sending %s to: %s%n", method, url);
 
@@ -118,7 +130,8 @@ public class ApiGatewayService {
                 .uri(url)
                 .retrieve()
                 .bodyToMono(String.class)
-                .transform(CircuitBreakerOperator.of(circuitBreaker))
+                .transform(RateLimiterOperator.of(rateLimiter)) //  Applying Rate Limiting
+                .transform(CircuitBreakerOperator.of(circuitBreaker)) //Applying circuit breaker
                 .transform(RetryOperator.of(retry))
                 .doOnNext(response -> {
                     double elapsed = System.currentTimeMillis() - startTime;

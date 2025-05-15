@@ -1,0 +1,159 @@
+.
+├── analytics-service
+│   ├── Dockerfile
+│   ├── HELP.md
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   ├── pom.xml
+│   └── src
+│       ├── main
+│       │   ├── java
+│       │   │   └── com
+│       │   │       └── petrichor
+│       │   │           └── analytics_service
+│       │   │               ├── AnalyticsServiceApplication.java
+│       │   │               └── controller
+│       │   │                   └── AnalyticsController.java
+│       │   └── resources
+│       │       ├── application.properties
+│       │       ├── application.yml
+│       │       ├── static
+│       │       └── templates
+│       └── test
+│           └── java
+│               └── com
+│                   └── petrichor
+│                       └── analytics_service
+│                           └── AnalyticsServiceApplicationTests.java
+├── api-gateway
+│   ├── Dockerfile
+│   ├── HELP.md
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   ├── pom.xml
+│   └── src
+│       ├── main
+│       │   ├── java
+│       │   │   └── com
+│       │   │       └── petrichor
+│       │   │           └── loadbalancer
+│       │   │               └── load_balancer
+│       │   │                   ├── ApiGatewayApplication.java
+│       │   │                   ├── algorithm
+│       │   │                   │   ├── AdaptiveAlgorithm.java
+│       │   │                   │   ├── LeastConnectionsAlgorithm.java
+│       │   │                   │   ├── LoadBalancerAlgorithm.java
+│       │   │                   │   └── RoundRobinAlgorithm.java
+│       │   │                   ├── config
+│       │   │                   │   ├── LoadBalancerConfig.java
+│       │   │                   │   ├── RateLimiterConfiguration.java
+│       │   │                   │   ├── Resilience4jConfig.java
+│       │   │                   │   └── WebClientConfig.java
+│       │   │                   ├── controller
+│       │   │                   │   └── ProxyController.java
+│       │   │                   ├── factory
+│       │   │                   │   └── LoadBalancerAlgorithmFactory.java
+│       │   │                   ├── model
+│       │   │                   │   └── ServerInfo.java
+│       │   │                   ├── service
+│       │   │                   │   └── ApiGatewayService.java
+│       │   │                   └── util
+│       │   │                       └── ServiceNameResolver.java
+│       │   └── resources
+│       │       ├── application.properties
+│       │       ├── application.yml
+│       │       ├── static
+│       │       └── templates
+│       └── test
+│           └── java
+│               └── com
+│                   └── petrichor
+│                       └── loadbalancer
+│                           └── load_balancer
+│                               └── LoadBalancerApplicationTests.java
+├── clean-structure.txt
+├── discovery-server
+│   ├── Dockerfile
+│   ├── HELP.md
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   ├── pom.xml
+│   └── src
+│       ├── main
+│       │   ├── java
+│       │   │   └── com
+│       │   │       └── petrichor
+│       │   │           └── discoveryserver
+│       │   │               └── DiscoveryServerApplication.java
+│       │   └── resources
+│       │       ├── application.properties
+│       │       ├── application.yml
+│       │       ├── static
+│       │       └── templates
+│       └── test
+│           └── java
+│               └── com
+│                   └── petrichor
+│                       └── discoveryserver
+│                           └── DiscoveryServerApplicationTests.java
+├── docker-compose.yml
+├── feature-service
+│   ├── Dockerfile
+│   ├── HELP.md
+│   ├── mvnw
+│   ├── mvnw.cmd
+│   ├── pom.xml
+│   └── src
+│       ├── main
+│       │   ├── java
+│       │   │   └── com
+│       │   │       └── petrichor
+│       │   │           └── feature_service
+│       │   │               ├── FeatureServiceApplication.java
+│       │   │               └── controller
+│       │   │                   └── FeatureController.java
+│       │   └── resources
+│       │       ├── application.properties
+│       │       ├── application.yml
+│       │       ├── static
+│       │       └── templates
+│       └── test
+│           └── java
+│               └── com
+│                   └── petrichor
+│                       └── feature_service
+│                           └── FeatureServiceApplicationTests.java
+├── pom.xml
+├── prometheus
+│   └── prometheus.yml
+├── rebuild.ps1
+├── simulate-requests
+│   └── simulate_requests.py
+└── toggle-service
+    ├── Dockerfile
+    ├── HELP.md
+    ├── mvnw
+    ├── mvnw.cmd
+    ├── pom.xml
+    └── src
+        ├── main
+        │   ├── java
+        │   │   └── com
+        │   │       └── petrichor
+        │   │           └── toggle_service
+        │   │               ├── ToggleServiceApplication.java
+        │   │               └── controller
+        │   │                   └── ToggleController.java
+        │   └── resources
+        │       ├── application.properties
+        │       ├── application.yml
+        │       ├── static
+        │       └── templates
+        └── test
+            └── java
+                └── com
+                    └── petrichor
+                        └── toggle_service
+                            └── ToggleServiceApplicationTests.java
+
+90 directories, 67 files

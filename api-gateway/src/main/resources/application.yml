@@ -7,14 +7,27 @@ resilience4j:
 
   circuitbreaker:
     instances:
-      http://backend-server-1:8080/api/test:
+      toggle-service:
         sliding-window-size: 10
         failure-rate-threshold: 50
-      http://backend-server-2:8080/api/test:
+      feature-service:
         sliding-window-size: 10
         failure-rate-threshold: 50
-      http://backend-server-3:8080/api/test:
+      analytics-service:
         sliding-window-size: 10
         failure-rate-threshold: 50
 
-
+  ratelimiter:
+    instances:
+      toggle-service:
+        limitForPeriod: 5
+        limitRefreshPeriod: 10s
+        timeoutDuration: 0
+      feature-service:
+        limitForPeriod: 3
+        limitRefreshPeriod: 10s
+        timeoutDuration: 0
+      analytics-service:
+        limitForPeriod: 3
+        limitRefreshPeriod: 10s
+        timeoutDuration: 0
