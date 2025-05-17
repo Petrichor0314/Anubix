@@ -1,16 +1,15 @@
-version: '3.8'
+version: "3.8"
 
 services:
   feature-service:
     build:
       context: .
       dockerfile: feature-service/Dockerfile
-    container_name: feature-service
     environment:
       SERVER_NAME: feature-service
       SERVER_PORT: 8080
-    ports:
-      - "8081:8080"
+    expose:
+      - "8080"
     networks:
       - monitoring
 
@@ -18,12 +17,11 @@ services:
     build:
       context: .
       dockerfile: toggle-service/Dockerfile
-    container_name: toggle-service
     environment:
       SERVER_NAME: toggle-service
       SERVER_PORT: 8080
-    ports:
-      - "8082:8080"
+    expose:
+      - "8080"
     networks:
       - monitoring
 
@@ -31,12 +29,11 @@ services:
     build:
       context: .
       dockerfile: analytics-service/Dockerfile
-    container_name: analytics-service
     environment:
       SERVER_NAME: analytics-service
       SERVER_PORT: 8080
-    ports:
-      - "8083:8080"
+    expose:
+      - "8080"
     networks:
       - monitoring
 
@@ -84,6 +81,38 @@ services:
     container_name: discovery-server
     ports:
       - "8761:8761"
+    networks:
+      - monitoring
+
+  redis:
+    image: redis:alpine
+    container_name: redis
+    ports:
+      - "6379:6379"
+    networks:
+      - monitoring
+
+  auth_service:
+    build:
+      context: .
+      dockerfile: auth_service/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      SPRING_DATA_MONGODB_URI: mongodb://mongo:27017/authdb
+      # Add any JWT secret or other env vars here
+    depends_on:
+      - mongo
+      - discovery-server
+    expose:
+      - "8080"
+    networks:
+      - monitoring
+
+  mongo:
+    image: mongo:latest
+    container_name: mongo
+    expose:
+      - "27017"
     networks:
       - monitoring
 

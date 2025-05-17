@@ -4,3 +4,4 @@ Thumbs.db
 .clean-structure.txt
 .vscode/
 .venv/
+.cursorignore

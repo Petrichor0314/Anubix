@@ -9,13 +9,43 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>pom</packaging> <!-- Important -->
 
+    <properties>
+        <java.version>17</java.version>
+        <spring-boot.version>3.2.5</spring-boot.version> <!-- Consistent Spring Boot Version -->
+        <spring-cloud.version>2023.0.1</spring-cloud.version> <!-- Compatible Spring Cloud Version -->
+        <maven-compiler-plugin.version>3.11.0</maven-compiler-plugin.version>
+    </properties>
+
     <modules>
         <module>feature-service</module>
         <module>toggle-service</module>
         <module>analytics-service</module>
         <module>api-gateway</module>
         <module>discovery-server</module>
+        <module>auth_service</module>
     </modules>
+
+    <dependencyManagement>
+        <dependencies>
+            <!-- Spring Boot BOM -->
+            <dependency>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-dependencies</artifactId>
+                <version>${spring-boot.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            <!-- Spring Cloud BOM -->
+            <dependency>
+                <groupId>org.springframework.cloud</groupId>
+                <artifactId>spring-cloud-dependencies</artifactId>
+                <version>${spring-cloud.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+            
+        </dependencies>
+    </dependencyManagement>
 
     <build>
         <pluginManagement>
@@ -23,12 +53,12 @@
                 <plugin>
                     <groupId>org.apache.maven.plugins</groupId>
                     <artifactId>maven-compiler-plugin</artifactId>
-                    <version>3.11.0</version>
+                    <version>${maven-compiler-plugin.version}</version> 
                 </plugin>
                 <plugin>
                     <groupId>org.springframework.boot</groupId>
                     <artifactId>spring-boot-maven-plugin</artifactId>
-                    <version>3.2.4</version>
+                    <version>${spring-boot.version}</version> 
                 </plugin>
             </plugins>
         </pluginManagement>

@@ -31,3 +31,10 @@ resilience4j:
         limitForPeriod: 3
         limitRefreshPeriod: 10s
         timeoutDuration: 0
+
+# Spring Data Redis Configuration
+spring:
+  data:
+    redis:
+      host: redis
+      port: 6379

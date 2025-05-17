@@ -2,14 +2,15 @@ global:
   scrape_interval: 5s
 
 scrape_configs:
-  - job_name: 'api-gateway'
-    metrics_path: '/actuator/prometheus'
+  - job_name: "api-gateway"
+    metrics_path: "/actuator/prometheus"
     static_configs:
-      - targets: ['api-gateway:8080']
+      - targets: ["api-gateway:8080"]
 
-  - job_name: 'services'
-    metrics_path: '/actuator/prometheus'
+  - job_name: "services"
+    metrics_path: "/actuator/prometheus"
     static_configs:
-      - targets: [ 'analytics-service:8083' ]
-      - targets: [ 'feature-service:8081' ]
-      - targets: [ 'toggle-service:8082' ]
+      - targets: ["feature-service:8080"]
+      - targets: ["toggle-service:8080"]
+      - targets: ["analytics-service:8080"]
+      - targets: ["auth_service:8080"]
