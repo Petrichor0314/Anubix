@@ -1,5 +1,5 @@
 # Anubix - Custom API Gateway with Advanced Load Balancing
-![image](https://github.com/user-attachments/assets/4f108f7c-52c2-4493-bb30-2f7581e5c8f7)
+![Untitled-2025-05-08-1519](https://github.com/user-attachments/assets/2044c9aa-4811-4066-bc16-dc163edc2731)
 
 Anubix is a demonstration of a custom-built API Gateway with advanced load balancing capabilities, built with Spring Boot 3.2.5 and Spring Cloud 2023.0.1. The platform showcases a robust API Gateway implementation with custom load balancing, circuit breaking, rate limiting, and monitoring capabilities.
 
