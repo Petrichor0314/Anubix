@@ -13,7 +13,7 @@ Built on Spring WebFlux and Project Reactor, Anubix leverages reactive programmi
   - Event-driven processing
   - Backpressure handling
   - Reactive streams support
-- **Custom Load Balancer**: Implements multiple load balancing algorithms (Round Robin, Weighted Round Robin, Least Connections)
+- **Custom Load Balancer**: Implements multiple load balancing algorithms (Round Robin, Least Connections , adaptive)
 - **Dynamic Service Discovery**: Automatic service registration and discovery via Eureka
 - **Advanced Routing**: Intelligent request routing with path-based and service-based routing
 - **Resilience Patterns**:
@@ -51,48 +51,13 @@ The following services are included as demonstrative examples to showcase the AP
 1. **Clone the repository**
 
    ```bash
-   git clone <repository-url>
+   git clone https://github.com/Petrichor0314/Anubix.git
    cd Anubix
    ```
 
 2. **Create environment files**
 
-   Create a `.env` file in the root directory with the following variables:
-
-   ```env
-   # Server Configuration
-   SERVER_PORT=8080 # Default port for API Gateway
-
-   # --- API Gateway: Load Balancer Configuration ---
-   LOADBALANCER_ALGORITHM=least-connections # Options: round-robin, weighted-round-robin, least-connections
-   LOADBALANCER_RETRIES=3                   # Number of retries for load balanced requests
-   LOADBALANCER_CACHE_TTL_SECONDS=60        # Time-to-live for load balancer cache in seconds
-
-   # --- API Gateway: Resilience4j Configuration ---
-   R4J_RETRY_MAX_ATTEMPTS=3             # Max retry attempts for Resilience4j
-   R4J_RETRY_WAIT_DURATION_MS=500       # Wait duration between retries in milliseconds
-
-   # --- API Gateway: Rate Limiter Configuration ---
-   RATELIMITER_LIMIT_FOR_PERIOD=100     # Max requests per period for the rate limiter
-   RATELIMITER_REFRESH_PERIOD_SECONDS=1 # Period in seconds for the rate limiter
-   RATELIMITER_TIMEOUT_MS=500           # Timeout duration for acquiring permission from rate limiter in milliseconds
-
-   # --- API Gateway: Health Check Configuration (for backend services) ---
-   HEALTHCHECK_ENABLED=true               # Enable/disable health checks for backend services
-   HEALTHCHECK_INITIAL_DELAY_MS=15000     # Initial delay before the first health check in milliseconds
-   HEALTHCHECK_INTERVAL_MS=30000          # Interval between health checks in milliseconds
-   HEALTHCHECK_PATH=/actuator/health      # Health endpoint path on backend services
-   HEALTHCHECK_TIMEOUT_MS=2000            # Timeout for each health check request in milliseconds
-
-   # --- Authentication (JWT) Configuration (used by API Gateway & Auth Service) ---
-   # Replace with your actual Base64 encoded secret key (at least 32 bytes long for HS256)
-   JWT_SECRET=yourStandardBase64EncodedSecretStringThatIsSufficientlyLongAndSecure
-   # JWT Expiration time in milliseconds (e.g., 1 hour = 3600000, 10 min = 600000)
-   JWT_EXPIRATION=3600000
-
-   # --- Auth Service: MongoDB Configuration ---
-   SPRING_DATA_MONGODB_URI=mongodb://mongo:27017/authdb # MongoDB connection URI for the Auth Service
-   ```
+   rename `.env.example` file in the root directory to `.env`:
 
 3. **Build and Run**
    ```powershell
@@ -105,7 +70,7 @@ The following services are included as demonstrative examples to showcase the AP
 
 - **Multiple Algorithms**:
   - Round Robin
-  - Weighted Round Robin
+  - Adaptive Algorithm
   - Least Connections
 - **Dynamic Instance Management**:
   - Automatic instance discovery
