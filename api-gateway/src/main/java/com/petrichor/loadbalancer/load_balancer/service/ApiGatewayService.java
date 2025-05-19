@@ -6,9 +6,10 @@ import java.util.Optional;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.cloud.client.ServiceInstance;
 import org.springframework.cloud.client.discovery.ReactiveDiscoveryClient;
+import org.springframework.core.io.buffer.DataBuffer;
 import org.springframework.data.redis.core.ReactiveStringRedisTemplate;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -19,6 +20,7 @@ import com.petrichor.loadbalancer.load_balancer.algorithm.LoadBalancerAlgorithm;
 import com.petrichor.loadbalancer.load_balancer.config.LoadBalancerConfig;
 import com.petrichor.loadbalancer.load_balancer.factory.LoadBalancerAlgorithmFactory;
 import com.petrichor.loadbalancer.load_balancer.model.ServerInfo;
+import com.petrichor.loadbalancer.load_balancer.registry.ServerInfoRegistry;
 
 import io.github.resilience4j.circuitbreaker.CircuitBreaker;
 import io.github.resilience4j.circuitbreaker.CircuitBreakerRegistry;
@@ -29,8 +31,8 @@ import io.github.resilience4j.reactor.ratelimiter.operator.RateLimiterOperator;
 import io.github.resilience4j.reactor.retry.RetryOperator;
 import io.github.resilience4j.retry.Retry;
 import io.github.resilience4j.retry.RetryRegistry;
-import reactor.core.publisher.Mono;
 import reactor.core.publisher.Flux;
+import reactor.core.publisher.Mono;
 
 @Service
 public class ApiGatewayService {
@@ -44,7 +46,8 @@ public class ApiGatewayService {
     private final ReactiveDiscoveryClient discoveryClient;
     private final RateLimiterRegistry rateLimiterRegistry;
     private final ReactiveStringRedisTemplate redisTemplate;
-    private final Duration cacheTtl; // Example: Make this configurable
+    private final Duration cacheTtl; 
+    private final ServerInfoRegistry serverInfoRegistry;
 
     public ApiGatewayService(
             LoadBalancerConfig config,
@@ -53,7 +56,8 @@ public class ApiGatewayService {
             RetryRegistry retryRegistry,
             RateLimiterRegistry rateLimiterRegistry,
             ReactiveDiscoveryClient reactiveDiscoveryClient,
-            ReactiveStringRedisTemplate redisTemplate // Inject Redis template
+            ReactiveStringRedisTemplate redisTemplate, 
+            ServerInfoRegistry serverInfoRegistry 
     ) {
         try {
         this.webClient = webClient;
@@ -65,12 +69,12 @@ public class ApiGatewayService {
         this.loadBalancerAlgorithm = LoadBalancerAlgorithmFactory.getAlgorithm(config.getAlgorithm());
             this.redisTemplate = redisTemplate;
             this.cacheTtl = Duration.ofSeconds(config.getCacheTtlSeconds() > 0 ? config.getCacheTtlSeconds() : 60); // Default to 60s, get from config
+            this.serverInfoRegistry = serverInfoRegistry; // Assigned field
 
             logger.info("[ApiGatewayService] Initialized with load balancer: " +
                     this.loadBalancerAlgorithm.getClass().getSimpleName() + " and Cache TTL: " + this.cacheTtl.getSeconds() + "s");
             if (this.redisTemplate == null) {
                 logger.error("[ApiGatewayService] CRITICAL: ReactiveStringRedisTemplate is NULL after injection.");
-                // Potentially throw an explicit error here if Spring doesn't already, though it should if it's a required dependency
             }
         } catch (Exception e) {
             logger.error("[ApiGatewayService] CRITICAL ERROR in constructor: ", e);
@@ -83,7 +87,7 @@ public class ApiGatewayService {
         return String.format("api-gateway-cache:%s:%s:%s", serviceName, path, httpMethod.toUpperCase());
     }
 
-    public Mono<String> forwardRequest(String serviceName, String path, String httpMethod) {
+    public Mono<String> forwardRequest(String serviceName, String path, String httpMethod, HttpHeaders headers, Flux<DataBuffer> body) {
         if (HttpMethod.GET.name().equalsIgnoreCase(httpMethod)) {
             String cacheKey = generateCacheKey(serviceName, path, httpMethod);
             System.out.printf("[forwardRequest] Attempting cache lookup for %s request. Key: %s%n", httpMethod, cacheKey);
@@ -95,7 +99,8 @@ public class ApiGatewayService {
                     })
                     .switchIfEmpty(Mono.<String>defer(() -> {
                         System.out.printf("[forwardRequest] Cache MISS for key: %s. Fetching from service.%n", cacheKey);
-                        return resolveAndForward(serviceName, path, httpMethod)
+                        // Pass headers and body for cache miss scenario too, though GETs won't typically have a body
+                        return resolveAndForward(serviceName, path, httpMethod, headers, body)
                                 .flatMap(responseFromService -> {
                                     // Cache only successful responses (e.g. assuming String response implies success for now)
                                     System.out.printf("[forwardRequest] Caching response for key: %s with TTL: %s%n", cacheKey, cacheTtl);
@@ -106,7 +111,7 @@ public class ApiGatewayService {
         } else {
             // For non-GET requests, or if caching is disabled for the method, proceed without caching.
             System.out.printf("[forwardRequest] Non-cacheable method %s. Forwarding directly.%n", httpMethod);
-            return resolveAndForward(serviceName, path, httpMethod);
+            return resolveAndForward(serviceName, path, httpMethod, headers, body);
         }
     }
 
@@ -114,7 +119,7 @@ public class ApiGatewayService {
      * Handles the actual resolution of service instance and forwarding the request.
      * This part is called on a cache miss or for non-cacheable methods.
      */
-    private Mono<String> resolveAndForward(String serviceName, String path, String httpMethod) {
+    private Mono<String> resolveAndForward(String serviceName, String path, String httpMethod, HttpHeaders headers, Flux<DataBuffer> body) {
         logger.info("[resolveAndForward] Processing {} request for service: {}, path: {}", httpMethod, serviceName, path);
 
         return this.discoveryClient.getInstances(serviceName) // This now returns Flux<ServiceInstance>
@@ -126,10 +131,10 @@ public class ApiGatewayService {
                             "No instances available for service: " + serviceName));
                 }
 
-                // Map ServiceInstance to ServerInfo. ServerInfo might hold connection counts or response times for advanced LB.
+                // Use ServerInfoRegistry to get or create ServerInfo objects
                 List<ServerInfo> availableServers = serviceInstances.stream()
-                                                                    .map(si -> new ServerInfo(si.getUri().toString()))
-                                                                    .toList();
+                        .map(si -> serverInfoRegistry.getOrCreateServerInfo(si.getUri().toString()))
+                        .toList();
 
                 Optional<ServerInfo> selectedServerOptional = loadBalancerAlgorithm.selectServer(availableServers);
 
@@ -144,7 +149,8 @@ public class ApiGatewayService {
         server.incrementConnections();
                 logger.info("[resolveAndForward] Routing to instance: {} for service: {}", server.getUrl(), serviceName); 
 
-                return forwardToInstance(serviceName, server, path, httpMethod)
+                // Pass headers and body to forwardToInstance
+                return forwardToInstance(serviceName, server, path, httpMethod, headers, body)
                 .doOnError(err -> {
                             logger.error("[resolveAndForward] Request to {} for service {} failed ultimately: {}", server.getUrl(), serviceName, err.getMessage(), err);
                 })
@@ -159,7 +165,7 @@ public class ApiGatewayService {
      * Performs the actual HTTP call to the target service instance,
      * wrapped with Resilience4j policies (RateLimiter, CircuitBreaker, Retry).
      */
-    private Mono<String> forwardToInstance(String serviceName, ServerInfo server, String path, String method)
+    private Mono<String> forwardToInstance(String serviceName, ServerInfo server, String path, String method, HttpHeaders headers, Flux<DataBuffer> body)
     {
         String url = server.getUrl() + path;
         long startTime = System.currentTimeMillis(); // For measuring response time, potentially for ServerInfo
@@ -171,9 +177,22 @@ public class ApiGatewayService {
 
         System.out.printf("[forwardToInstance] Sending %s to: %s%n", method, url);
 
-        return webClient.method(HttpMethod.valueOf(method))
+        WebClient.RequestBodySpec requestSpec = webClient.method(HttpMethod.valueOf(method))
                 .uri(url)
-                .retrieve() // Simple retrieve, assumes response body is String and handles errors via status codes
+                .headers(h -> {
+                    h.addAll(headers); // Copy all original headers
+                    // WebClient manages Host header, Content-Length, Transfer-Encoding automatically
+                    // Remove potentially problematic headers if necessary, e.g., h.remove(HttpHeaders.HOST);
+                });
+
+        WebClient.RequestHeadersSpec<?> finalSpec;
+        if (HttpMethod.valueOf(method) == HttpMethod.POST || HttpMethod.valueOf(method) == HttpMethod.PUT || HttpMethod.valueOf(method) == HttpMethod.PATCH) {
+            finalSpec = requestSpec.body(body, DataBuffer.class);
+        } else {
+            finalSpec = requestSpec;
+        }
+        
+        return finalSpec.retrieve()
                 .bodyToMono(String.class)
                 .transform(RateLimiterOperator.of(rateLimiter))
                 .transform(CircuitBreakerOperator.of(circuitBreaker))

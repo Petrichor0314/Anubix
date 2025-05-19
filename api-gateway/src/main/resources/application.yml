@@ -1,40 +1,92 @@
-resilience4j:
-  retry:
-    instances:
-      load-balancer-retry:
-        max-attempts: 3
-        wait-duration: 200ms
-
-  circuitbreaker:
-    instances:
-      toggle-service:
-        sliding-window-size: 10
-        failure-rate-threshold: 50
-      feature-service:
-        sliding-window-size: 10
-        failure-rate-threshold: 50
-      analytics-service:
-        sliding-window-size: 10
-        failure-rate-threshold: 50
-
-  ratelimiter:
-    instances:
-      toggle-service:
-        limitForPeriod: 5
-        limitRefreshPeriod: 10s
-        timeoutDuration: 0
-      feature-service:
-        limitForPeriod: 3
-        limitRefreshPeriod: 10s
-        timeoutDuration: 0
-      analytics-service:
-        limitForPeriod: 3
-        limitRefreshPeriod: 10s
-        timeoutDuration: 0
-
-# Spring Data Redis Configuration
 spring:
+  application:
+    name: api-gateway
   data:
     redis:
       host: redis
       port: 6379
+
+server:
+  port: ${SERVER_PORT:8080} # From docker-compose
+
+eureka:
+  client:
+    serviceUrl:
+      defaultZone: ${EUREKA_URI:http://discovery-server:8761/eureka}
+  instance:
+    preferIpAddress: true
+    leaseRenewalIntervalInSeconds: 10
+    leaseExpirationDurationInSeconds: 30
+    metadata-map:
+      startup: ${random.long} # Prevents NCDFE
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: "*"
+  metrics:
+    tags:
+      application: ${spring.application.name}
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+
+resilience4j:
+  retry:
+    instances:
+      load-balancer-retry:
+        max-attempts: ${LOADBALANCER_RETRIES:3} # Use env var
+        wait-duration: ${LOADBALANCER_RETRY_DELAY:200ms} # Use env var
+
+  circuitbreaker:
+    configs: # Define shared configurations under 'configs'
+      default:
+        sliding-window-size: 10
+        failure-rate-threshold: 50
+        wait-duration-in-open-state: 10s
+        permitted-number-of-calls-in-half-open-state: 2
+        registerHealthIndicator: true # Good practice: makes CB state part of health checks
+        automaticTransitionFromOpenToHalfOpenEnabled: true # Good practice
+
+    instances:
+      toggle-service:
+        base-config: default
+      feature-service:
+        base-config: default
+      analytics-service:
+        base-config: default
+      auth-service:
+        base-config: default
+
+  ratelimiter:
+    configs: # Define shared configurations under 'configs'
+      default:
+        limitForPeriod: 10
+        limitRefreshPeriod: 1s
+        timeoutDuration: 0
+    instances:
+      toggle-service:
+        base-config: default
+        limitForPeriod: 5
+      feature-service:
+        base-config: default
+        limitForPeriod: 3
+      analytics-service:
+        base-config: default
+        limitForPeriod: 3
+      auth-service:
+        base-config: default
+        limitForPeriod: 10 # allow more for auth
+
+# Load Balancer specific config
+loadbalancer:
+  algorithm: ${LOADBALANCER_ALGORITHM:round-robin} # From docker-compose
+  cacheTtlSeconds: ${CACHE_TTL_SECONDS:60}
+
+logging:
+  level:
+    com.petrichor.loadbalancer.load_balancer: DEBUG
+    org.springframework.security: INFO # Or DEBUG for more verbose security logs
+    com.netflix.discovery: DEBUG # Added for Eureka client activity

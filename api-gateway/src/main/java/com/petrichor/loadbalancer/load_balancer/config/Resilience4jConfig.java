@@ -1,15 +1,18 @@
 package com.petrichor.loadbalancer.load_balancer.config;
 
-import io.github.resilience4j.retry.RetryConfig;
-import io.github.resilience4j.retry.RetryRegistry;
+import java.util.Arrays;
+import java.util.List;
+import java.util.function.Predicate;
+
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.web.server.ResponseStatusException;
-import java.util.Arrays;
-import java.util.List;
-import java.util.function.Predicate;
+
+import io.github.resilience4j.retry.RetryConfig;
+import io.github.resilience4j.retry.RetryRegistry;
 
 
 @Configuration
@@ -34,11 +37,17 @@ public class Resilience4jConfig {
         return true; // Retry on other exceptions
     };
 
+    @Value("${R4J_RETRY_MAX_ATTEMPTS:3}")
+    private int maxAttempts;
+
+    @Value("${R4J_RETRY_WAIT_DURATION_MS:500}")
+    private long waitDurationMillis;
+
     @Bean
     public RetryRegistry retryRegistry() {
         RetryConfig config = RetryConfig.custom()
-                .maxAttempts(3)
-                .waitDuration(java.time.Duration.ofMillis(500))
+                .maxAttempts(maxAttempts)
+                .waitDuration(java.time.Duration.ofMillis(waitDurationMillis))
                 .retryOnException(RETRYABLE_EXCEPTIONS)  // Only retry on retryable errors
                 .failAfterMaxAttempts(true)  // Propagate the last error after max attempts
                 .build();

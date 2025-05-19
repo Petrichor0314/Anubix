@@ -1,9 +1,9 @@
 package com.petrichor.loadbalancer.load_balancer.util;
 
-import org.springframework.stereotype.Component;
-
 import java.util.Map;
 import java.util.Optional;
+
+import org.springframework.stereotype.Component;
 
 @Component
 public class ServiceNameResolver {
@@ -11,7 +11,8 @@ public class ServiceNameResolver {
     private static final Map<String, String> PREFIX_TO_EUREKA = Map.of(
             "features", "FEATURE-SERVICE",
             "toggles", "TOGGLE-SERVICE",
-            "analytics", "ANALYTICS-SERVICE"
+            "analytics", "ANALYTICS-SERVICE",
+            "auth", "AUTH-SERVICE"
     );
 
     /**

@@ -1,4 +1,7 @@
 FROM eclipse-temurin:17-jdk-alpine
-VOLUME /tmp
-COPY target/*.jar app.jar
-ENTRYPOINT ["java","-jar","/app.jar"]
+
+WORKDIR /app
+
+COPY auth_service/target/app.jar app.jar
+
+ENTRYPOINT ["java","-jar","app.jar"]

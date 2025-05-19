@@ -1,0 +1,12 @@
+security:
+  user:
+    name: ${SECURITY_USER_NAME:user}
+    password: ${SECURITY_USER_PASSWORD:password}
+
+# JWT Configuration - These should be sourced from environment variables via @Value
+# jwt:
+#   secret: "yourSuperStrongBase64EncodedSecretKeyWhichIsAtLeast32BytesLongForHS256"
+#   expiration: 3600000
+
+logging:
+  level:

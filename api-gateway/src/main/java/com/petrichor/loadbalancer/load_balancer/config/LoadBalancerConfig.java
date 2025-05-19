@@ -20,7 +20,7 @@ public class LoadBalancerConfig {
     @Value("${loadbalancer.retries:3}")
     private int retries;
 
-    @Value("${loadbalancer.cache.ttl-seconds:60}")
+    @Value("${LOADBALANCER_CACHE_TTL_SECONDS:60}")
     private int cacheTtlSeconds;
 
     @PostConstruct

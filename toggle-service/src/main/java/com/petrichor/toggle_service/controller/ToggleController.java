@@ -31,6 +31,18 @@ public class ToggleController {
         return Mono.just("List of toggles");
     }
 
+    @GetMapping("/list")
+    public Mono<String> getToggleList() {
+        logger.info("ToggleService instance '{}' received request for getToggleList", hostname);
+        return Mono.just("Toggle list");
+    }
+
+    @GetMapping("/detail/{id}")
+    public Mono<String> getToggleDetail(@PathVariable("id") String id) {
+        logger.info("ToggleService instance '{}' received request for getToggleDetail with id: {}", hostname, id);
+        return Mono.delay(Duration.ofMillis(300)).thenReturn("Toggle detail for ID: " + id);
+    }
+
     @GetMapping("/status")
     public Mono<String> getToggleStatus() {
         logger.info("ToggleService instance '{}' received request for getToggleStatus", hostname);
@@ -38,7 +50,7 @@ public class ToggleController {
     }
 
     @GetMapping("/enable/{toggleName}")
-    public Mono<String> enableToggle(@PathVariable String toggleName) {
+    public Mono<String> enableToggle(@PathVariable("toggleName") String toggleName) {
         return Mono.delay(Duration.ofMinutes(1)).thenReturn("Enabled toggle: " + toggleName);
     }
 }

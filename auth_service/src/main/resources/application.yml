@@ -5,18 +5,69 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: "*"
   endpoint:
     prometheus:
       enabled: true
   metrics:
-    export:
-      prometheus:
+    tags:
+      application: ${spring.application.name}
+  prometheus:
+    metrics:
+      export:
         enabled: true
 
 eureka:
   client:
-    service-url:
-      defaultZone: http://discovery-server:8761/eureka
+    serviceUrl:
+      defaultZone: ${EUREKA_URI:http://discovery-server:8761/eureka}
   instance:
-    prefer-ip-address: true
+    preferIpAddress: true
+    leaseRenewalIntervalInSeconds: 10
+    leaseExpirationDurationInSeconds: 30
+    metadata-map:
+      startup: ${random.long}
+
+spring:
+  application:
+    name: auth-service
+  data:
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI}
+  security:
+    user:
+      name: ${SECURITY_USER_NAME:user}
+      password: ${SECURITY_USER_PASSWORD:password}
+
+# JWT Configuration - These should be sourced from environment variables via @Value annotations in JwtUtil.java
+# Ensure JWT_SECRET and JWT_EXPIRATION are set in the environment (e.g., .env file used by docker-compose).
+# jwt:
+#   secret: "yourSuperStrongBase64EncodedSecretKeyWhichIsAtLeast32BytesLongForHS256" # This would override env var if uncommented
+#   expiration: 3600000 # This would override env var if uncommented
+
+logging:
+  level:
+    root: INFO
+    com.petrichor.auth_service: DEBUG
+    org.springframework.security: DEBUG
+    org.springframework.data.mongodb: INFO
+
+# For Docker profile (referenced in docker-compose.yml)
+---
+spring:
+  config:
+    activate:
+      on-profile: docker
+  data:
+    mongodb:
+      uri: ${SPRING_DATA_MONGODB_URI}
+
+logging:
+  level:
+    org.springframework.security: TRACE
+    com.petrichor.auth_service: DEBUG
+    org.springframework.web: TRACE
+    org.springframework.web.reactive: TRACE
+    org.springframework.http.codec: TRACE
+    org.springframework.boot.autoconfigure.web.reactive.error: TRACE
+    reactor.netty.http.server: DEBUG

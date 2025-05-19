@@ -1,0 +1,329 @@
+{
+  "info": {
+    "_postman_id": "your-postman-id",
+    "name": "Anubix API Gateway Tests",
+    "description": "Collection for testing Anubix API Gateway capabilities including load balancing, circuit breaking, and rate limiting",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "1. Authentication",
+      "item": [
+        {
+          "name": "Login (Get JWT)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "pm.environment.set(\"jwt_token\", jsonData.token);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"user\",\n    \"password\": \"password\"\n}"
+            },
+            "url": {
+              "raw": "http://localhost:8080/auth/auth/login",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["auth", "auth", "login"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Features Service",
+      "item": [
+        {
+          "name": "Get Root",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/features/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["features", ""]
+            }
+          }
+        },
+        {
+          "name": "Get List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/features/list",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["features", "list"]
+            }
+          }
+        },
+        {
+          "name": "Get Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/features/detail/1",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["features", "detail", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Toggle Service",
+      "item": [
+        {
+          "name": "Get Root",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/toggles/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["toggles", ""]
+            }
+          }
+        },
+        {
+          "name": "Get List",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/toggles/list",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["toggles", "list"]
+            }
+          }
+        },
+        {
+          "name": "Get Detail",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/toggles/detail/1",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["toggles", "detail", "1"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Analytics Service",
+      "item": [
+        {
+          "name": "Get Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/analytics/stats",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["analytics", "stats"]
+            }
+          }
+        },
+        {
+          "name": "Get Report",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/analytics/report",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["analytics", "report"]
+            }
+          }
+        },
+        {
+          "name": "Get Root",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{jwt_token}}"
+              }
+            ],
+            "url": {
+              "raw": "http://localhost:8080/analytics/",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["analytics", ""]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Health Checks",
+      "item": [
+        {
+          "name": "API Gateway Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/actuator/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["actuator", "health"]
+            }
+          }
+        },
+        {
+          "name": "Auth Service Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/auth/actuator/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["auth", "actuator", "health"]
+            }
+          }
+        },
+        {
+          "name": "Features Service Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/features/actuator/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["features", "actuator", "health"]
+            }
+          }
+        },
+        {
+          "name": "Toggles Service Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/toggles/actuator/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["toggles", "actuator", "health"]
+            }
+          }
+        },
+        {
+          "name": "Analytics Service Health",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "http://localhost:8080/analytics/actuator/health",
+              "protocol": "http",
+              "host": ["localhost"],
+              "port": "8080",
+              "path": ["analytics", "actuator", "health"]
+            }
+          }
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [""]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:8080",
+      "type": "string"
+    }
+  ]
+}
